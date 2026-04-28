@@ -55,15 +55,16 @@ Demo: pushing to `dragonly/md` triggers a build that includes the real content.
   - `dragonly/md` repo secret `MDBOOK_DISPATCH_TOKEN` — fine-grained PAT with actions:write on `dragonly/mdbook`
   - (Step 4) `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in `dragonly/mdbook`
 
-### Step 4 — Cloudflare Pages deploy 🚧
+### Step 4 — Cloudflare Pages deploy ✅
 
-Demo: `https://<project>.pages.dev` serves the latest content on every push.
+Demo: `https://mdbook-3vn.pages.dev` serves the latest content on every push.
 
-- ⬜ Create Cloudflare Pages project `mdbook` (manual, requires CF account)
-- ⬜ Generate CF API token with `Cloudflare Pages — Edit` permission
-- ⬜ Add `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` as `dragonly/mdbook` repo secrets
-- ✅ Workflow already includes the `pages deploy` step (conditional, auto-activates when secrets are present)
-- ⬜ Smoke test: push a new doc in `dragonly/md` → verify rebuild + live within ~1 minute
+- ✅ Cloudflare Pages project `mdbook` created via `wrangler pages project create`
+- ✅ `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` set as `dragonly/mdbook` repo secrets
+- ✅ `CONTENT_REPO_TOKEN` set (fine-grained PAT, contents:read on `dragonly/md`)
+- ✅ `MDBOOK_DISPATCH_TOKEN` set in `dragonly/md` (PAT with actions:write on `dragonly/mdbook`)
+- ✅ Cross-repo dispatch uses `workflow_dispatch` endpoint (not `repository_dispatch`) — needs only actions:write, not contents:write
+- ✅ End-to-end smoke test: `notes/hello.md` pushed to content repo → rebuilt + live within ~90s — callouts, Shiki, pinned home section, external GitHub link all render correctly
 
 ### Step 5 — PAT login + live-preview fallback ⬜
 
@@ -136,3 +137,5 @@ Demo: pi and Claude Code both successfully write a doc into `dragonly/md` follow
 - **2026-04-28** — i18n layer from day 1, English-only for v0.1.
 - **2026-04-28** — **Step 3a** (GitHub Actions dual checkout) chosen over submodule / remote loader. Workflow dispatch from content repo triggers frontend rebuild.
 - **2026-04-28** — Build artifact deployed via `cloudflare/wrangler-action` from GitHub Actions, not via Cloudflare Pages' native git integration — lets us keep content-repo PAT in GitHub secrets rather than Cloudflare env.
+- **2026-04-28** — Cross-repo trigger uses `workflow_dispatch` endpoint instead of `repository_dispatch` — the former needs only `actions:write` on the fine-grained PAT, the latter silently requires `contents:write`.
+- **2026-04-28** — Site live at `https://mdbook-3vn.pages.dev`. End-to-end loop verified.
