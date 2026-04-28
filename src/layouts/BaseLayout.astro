@@ -1,0 +1,103 @@
+---
+import { getCollection } from "astro:content";
+import TreeItem, { type TreeNode } from "../components/TreeItem.astro";
+import { t } from "../i18n";
+import "../styles/global.css";
+
+export interface Props {
+  title?: string;
+  description?: string;
+  activeSlug?: string;
+}
+
+const { title, description, activeSlug } = Astro.props;
+const siteTitle = t("site.title");
+const fullTitle = title ? `${title} — ${siteTitle}` : siteTitle;
+
+const allDocs = await getCollection("docs", ({ data }) => data.draft !== true);
+
+function makeNode(name: string): TreeNode {
+  return { name, children: new Map() };
+}
+
+const root: TreeNode = makeNode("");
+
+for (const entry of allDocs) {
+  const parts = entry.id.split("/");
+  let node = root;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const p = parts[i];
+    if (!node.children.has(p)) node.children.set(p, makeNode(p));
+    node = node.children.get(p)!;
+  }
+  const leafName = parts[parts.length - 1];
+  const leaf = makeNode(leafName);
+  leaf.slug = entry.id;
+  leaf.title = entry.data.title ?? leafName;
+  leaf.order = entry.data.order;
+  node.children.set(leafName, leaf);
+}
+
+const rootChildren = Array.from(root.children.values()).sort((a, b) => {
+  const aDir = !a.slug;
+  const bDir = !b.slug;
+  if (aDir !== bDir) return aDir ? -1 : 1;
+  return a.name.localeCompare(b.name);
+});
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description ?? t("site.tagline")} />
+    <title>{fullTitle}</title>
+    <script is:inline>
+      (() => {
+        const saved = localStorage.getItem("theme");
+        const theme =
+          saved ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <button class="icon-btn" id="tree-toggle" aria-label={t("nav.toggleTree")}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <a href="/" class="brand">{siteTitle}</a>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="theme-toggle" aria-label={t("nav.toggleTheme")}>
+        <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <nav class="tree" aria-label={t("tree.title")}>
+          {rootChildren.map((child) => (
+            <TreeItem node={child} activeSlug={activeSlug} />
+          ))}
+        </nav>
+      </aside>
+      <main class="content">
+        <slot />
+      </main>
+    </div>
+
+    <script>
+      document.getElementById("theme-toggle")?.addEventListener("click", () => {
+        const cur = document.documentElement.dataset.theme;
+        const next = cur === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem("theme", next);
+      });
+      document.getElementById("tree-toggle")?.addEventListener("click", () => {
+        document.getElementById("sidebar")?.classList.toggle("open");
+      });
+    </script>
+  </body>
+</html>

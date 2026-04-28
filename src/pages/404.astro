@@ -1,0 +1,12 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { t } from "../i18n";
+---
+
+<BaseLayout title={t("error.404.title")}>
+  <div class="error-state">
+    <h1>404 — {t("error.404.title")}</h1>
+    <p>{t("error.404.body")}</p>
+    <p><a href="/">← {t("nav.home")}</a></p>
+  </div>
+</BaseLayout>

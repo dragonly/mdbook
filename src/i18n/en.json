@@ -1,0 +1,18 @@
+{
+  "site.title": "mdbook",
+  "site.tagline": "A markdown library for humans and agents.",
+  "nav.home": "Home",
+  "nav.toggleTheme": "Toggle theme",
+  "nav.toggleTree": "Toggle file tree",
+  "home.recent": "Recently updated",
+  "home.pinned": "Pinned",
+  "home.empty": "No documents yet. Create one in the content repo.",
+  "doc.updated": "Updated",
+  "doc.created": "Created",
+  "doc.tags": "Tags",
+  "doc.viewOnGithub": "View on GitHub",
+  "tree.title": "Files",
+  "search.placeholder": "Search…",
+  "error.404.title": "Not found",
+  "error.404.body": "This document doesn't exist in the current build. If it was just created, the site may still be building."
+}

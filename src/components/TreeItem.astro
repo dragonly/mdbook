@@ -1,0 +1,56 @@
+---
+import type { CollectionEntry } from "astro:content";
+
+export type TreeNode = {
+  name: string;
+  slug?: string;
+  title?: string;
+  order?: number;
+  children: Map<string, TreeNode>;
+};
+
+export interface Props {
+  node: TreeNode;
+  activeSlug?: string;
+  depth?: number;
+}
+
+const { node, activeSlug, depth = 0 } = Astro.props;
+
+function sortChildren(n: TreeNode): TreeNode[] {
+  const arr = Array.from(n.children.values());
+  arr.sort((a, b) => {
+    const aDir = !a.slug;
+    const bDir = !b.slug;
+    if (aDir !== bDir) return aDir ? -1 : 1;
+    const ao = a.order ?? Infinity;
+    const bo = b.order ?? Infinity;
+    if (ao !== bo) return ao - bo;
+    return a.name.localeCompare(b.name);
+  });
+  return arr;
+}
+
+const isLeaf = !!node.slug;
+const isActive = activeSlug && node.slug === activeSlug;
+const children = sortChildren(node);
+---
+
+{isLeaf ? (
+  <a
+    href={`/${node.slug}/`}
+    class:list={["tree-leaf", { active: isActive }]}
+    style={`--depth:${depth}`}
+  >
+    {node.title ?? node.name}
+  </a>
+) : (
+  <details open class="tree-branch" style={`--depth:${depth}`}>
+    <summary>{node.name}</summary>
+    <div class="tree-children">
+      {children.map((child) => (
+        <Astro.self node={child} activeSlug={activeSlug} depth={depth + 1} />
+      ))}
+    </div>
+  </details>
+)}

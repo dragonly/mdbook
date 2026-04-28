@@ -1,0 +1,65 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { t } from "../i18n";
+
+const docs = await getCollection("docs", ({ data }) => data.draft !== true);
+
+const pinned = docs
+  .filter((d) => d.data.pinned)
+  .sort((a, b) => (a.data.title ?? a.id).localeCompare(b.data.title ?? b.id));
+
+const recent = [...docs]
+  .sort((a, b) => {
+    const ad = a.data.updated ?? a.data.created ?? new Date(0);
+    const bd = b.data.updated ?? b.data.created ?? new Date(0);
+    return bd.getTime() - ad.getTime();
+  })
+  .slice(0, 10);
+
+function fmt(d?: Date) {
+  if (!d) return "";
+  return d.toISOString().slice(0, 10);
+}
+---
+
+<BaseLayout>
+  <section class="hero">
+    <h1>{t("site.title")}</h1>
+    <p>{t("site.tagline")}</p>
+  </section>
+
+  {pinned.length > 0 && (
+    <section class="home-section">
+      <h2>{t("home.pinned")}</h2>
+      <ul class="home-list">
+        {pinned.map((d) => (
+          <li>
+            <a href={`/${d.id}/`}>
+              <span>{d.data.title ?? d.id}</span>
+              <span class="date">{fmt(d.data.updated ?? d.data.created)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  <section class="home-section">
+    <h2>{t("home.recent")}</h2>
+    {recent.length === 0 ? (
+      <p class="error-state">{t("home.empty")}</p>
+    ) : (
+      <ul class="home-list">
+        {recent.map((d) => (
+          <li>
+            <a href={`/${d.id}/`}>
+              <span>{d.data.title ?? d.id}</span>
+              <span class="date">{fmt(d.data.updated ?? d.data.created)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+</BaseLayout>

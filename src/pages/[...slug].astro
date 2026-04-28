@@ -1,0 +1,47 @@
+---
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { t } from "../i18n";
+
+export async function getStaticPaths() {
+  const docs = await getCollection("docs", ({ data }) => data.draft !== true);
+  return docs.map((doc) => ({
+    params: { slug: doc.id },
+    props: { doc },
+  }));
+}
+
+const { doc } = Astro.props;
+const { Content } = await render(doc);
+
+const title = doc.data.title ?? doc.id.split("/").pop();
+const updated = doc.data.updated;
+const created = doc.data.created;
+const tags = doc.data.tags ?? [];
+
+const fmt = (d?: Date) => (d ? d.toISOString().slice(0, 10) : "");
+const githubUrl = `https://github.com/dragonly/md/commits/main/${doc.id}.md`;
+---
+
+<BaseLayout title={title as string} activeSlug={doc.id}>
+  <article class="prose">
+    <header class="doc-header">
+      <h1 class="doc-title">{title}</h1>
+      <div class="doc-meta">
+        {updated && (
+          <span>{t("doc.updated")}: {fmt(updated)}</span>
+        )}
+        {created && created.getTime() !== updated?.getTime() && (
+          <span>{t("doc.created")}: {fmt(created)}</span>
+        )}
+        {tags.length > 0 && (
+          <span class="tags">
+            {tags.map((tag: string) => <span class="tag">#{tag}</span>)}
+          </span>
+        )}
+        <a href={githubUrl} target="_blank" rel="noopener">{t("doc.viewOnGithub")} ↗</a>
+      </div>
+    </header>
+    <Content />
+  </article>
+</BaseLayout>
