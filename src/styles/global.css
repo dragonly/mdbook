@@ -288,9 +288,35 @@ html[data-theme="dark"] .prose .astro-code span {
   margin: 2.5em 0;
 }
 
-/* GitHub-style callouts (remark-gfm + rehype-callouts would render these;
-   for v0.1 step 1 we provide base blockquote styling; a plugin comes later). */
-.prose blockquote p:first-child strong:first-child { color: var(--fg); }
+/* GitHub-style callouts via remark-github-blockquote-alert.
+   Rendered as <div class="markdown-alert markdown-alert-note"> etc. */
+.prose .markdown-alert {
+  margin: 1.25em 0;
+  padding: 0.75em 1em;
+  border-left: 4px solid var(--alert-color, var(--border));
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--bg-soft);
+  color: var(--fg);
+}
+.prose .markdown-alert > :first-child { margin-top: 0; }
+.prose .markdown-alert > :last-child { margin-bottom: 0; }
+.prose .markdown-alert-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-weight: 600;
+  color: var(--alert-color, var(--fg));
+  margin-bottom: 0.4em;
+  text-transform: capitalize;
+  font-size: 0.9em;
+  letter-spacing: 0.02em;
+}
+.prose .markdown-alert-title svg { width: 1em; height: 1em; }
+.prose .markdown-alert-note      { --alert-color: #3b82f6; }
+.prose .markdown-alert-tip       { --alert-color: #10b981; }
+.prose .markdown-alert-important { --alert-color: #8b5cf6; }
+.prose .markdown-alert-warning   { --alert-color: #f59e0b; }
+.prose .markdown-alert-caution   { --alert-color: #ef4444; }
 
 /* ---------- Document meta ---------- */
 .doc-header {

@@ -25,7 +25,7 @@ Demo: two-column layout rendering a fixture folder of markdown, no GitHub yet.
 - ✅ Three fixture markdown files validating the pipeline
 - ✅ `pnpm build` green, 5 static pages generated
 
-### Step 2 — Rendering pipeline polish ✅ (core) / 🚧 (extras)
+### Step 2 — Rendering pipeline polish ✅
 
 Demo: vanilla markdown rendered with GitHub parity + theme-aware polish.
 
@@ -36,37 +36,34 @@ Demo: vanilla markdown rendered with GitHub parity + theme-aware polish.
 - ✅ Readable typography (Inter + PingFang SC + JetBrains Mono, line-height 1.75)
 - ✅ Table / blockquote / image / hr styling
 - ✅ Mobile layout (sidebar becomes drawer)
-- ⬜ GitHub-style callouts (`> [!NOTE]` etc.) — needs a remark plugin; base blockquote styling in place
-- ⬜ Relative link rewriting (`./foo.md` → SPA route) — v0.1 must-have, not yet wired
-- ⬜ Image lazy-load attribute on `<img>` (CSS hint present, HTML attr not yet)
+- ✅ GitHub-style callouts via `remark-github-blockquote-alert` with custom color system
+- ✅ Relative `.md` link rewriting to SPA routes (custom rehype plugin `src/lib/rehype-md-links.ts`)
+- ✅ Image `loading="lazy"` + `decoding="async"` injected by the same plugin
 
-### Step 3 — Hook up the real content repo at build time ⬜
+### Step 3 — Hook up the real content repo at build time ✅
 
 Demo: pushing to `dragonly/md` triggers a build that includes the real content.
 
-Decision needed (pick one):
-- **3a — GitHub Actions w/ dual checkout (recommended)**: workflow checks out `dragonly/mdbook` into root and `dragonly/md` into `src/content/docs/`, then builds. Pros: no submodule ceremony, keeps content repo independent; Cons: requires a PAT secret with read access to private content repo.
-- **3b — Git submodule**: add `dragonly/md` as a submodule at `src/content/docs/`. Pros: works identically locally and in CI; Cons: submodule friction, agents need to remember `--recurse-submodules`.
-- **3c — Remote content loader at build time**: a custom Astro content loader that fetches via GitHub API. Pros: nothing on disk; Cons: more code, slower builds, API-rate-limit exposure.
+**Decision: 3a — GitHub Actions w/ dual checkout.** Chose this over submodules (agent friction) and remote content loader (extra code, rate-limit exposure).
 
-Leaning **3a**. Creates a fine-grained PAT (contents:read on `dragonly/md`), stored as a Cloudflare / GitHub Actions secret.
+- ✅ `scripts/sync-content.sh` — clones `dragonly/md` (via SSH locally or PAT in CI), replaces `src/content/docs/`, filters out `.git`, `.github`, `README.md`, `AGENTS.md`
+- ✅ `.github/workflows/deploy.yml` in `mdbook` — triggers on push, `repository_dispatch: content-updated`, or manual; installs deps, syncs content, builds, uploads artifact, and conditionally deploys to Cloudflare Pages (skipped if secrets absent)
+- ✅ `.github/workflows/notify-mdbook.yml` in `dragonly/md` — on content push, dispatches `content-updated` to `dragonly/mdbook` (no-op if `MDBOOK_DISPATCH_TOKEN` secret not set)
+- ✅ Local verification: `CONTENT_REPO_SSH=1 ./scripts/sync-content.sh && pnpm build` produces empty-but-valid site; fixtures restored via `git checkout` for dev
+- ⚠️ Secrets to add manually (out-of-band):
+  - `dragonly/mdbook` repo secret `CONTENT_REPO_TOKEN` — fine-grained PAT with contents:read on `dragonly/md`
+  - `dragonly/md` repo secret `MDBOOK_DISPATCH_TOKEN` — fine-grained PAT with actions:write on `dragonly/mdbook`
+  - (Step 4) `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in `dragonly/mdbook`
 
-Tasks:
-- ⬜ Choose strategy (recommend 3a)
-- ⬜ `.github/workflows/deploy.yml` in `mdbook`
-- ⬜ PAT stored as repo secret `CONTENT_REPO_TOKEN`
-- ⬜ Build script clears `src/content/docs/` fixtures, copies real content, then `astro build`
-- ⬜ A webhook / `repository_dispatch` from `dragonly/md` pushes to trigger rebuild when content changes
-
-### Step 4 — Cloudflare Pages deploy ⬜
+### Step 4 — Cloudflare Pages deploy 🚧
 
 Demo: `https://<project>.pages.dev` serves the latest content on every push.
 
-- ⬜ Create Cloudflare Pages project pointing at `dragonly/mdbook`
-- ⬜ Build command `pnpm build`, output `dist`
-- ⬜ Wire `CONTENT_REPO_TOKEN` as a Pages env secret
-- ⬜ Configure cross-repo trigger: `dragonly/md` push → `repository_dispatch` on `dragonly/mdbook` → Pages rebuild
-- ⬜ Smoke test: push a new doc in `dragonly/md`, verify it appears on `*.pages.dev` within a minute
+- ⬜ Create Cloudflare Pages project `mdbook` (manual, requires CF account)
+- ⬜ Generate CF API token with `Cloudflare Pages — Edit` permission
+- ⬜ Add `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` as `dragonly/mdbook` repo secrets
+- ✅ Workflow already includes the `pages deploy` step (conditional, auto-activates when secrets are present)
+- ⬜ Smoke test: push a new doc in `dragonly/md` → verify rebuild + live within ~1 minute
 
 ### Step 5 — PAT login + live-preview fallback ⬜
 
@@ -137,4 +134,5 @@ Demo: pi and Claude Code both successfully write a doc into `dragonly/md` follow
 - **2026-04-28** — Split repos: `dragonly/md` (private content) + `dragonly/mdbook` (public frontend).
 - **2026-04-28** — Commit format `docs(<folder>): <filename> — <summary>`. Auto commit + push from agents.
 - **2026-04-28** — i18n layer from day 1, English-only for v0.1.
-- **2026-04-28** — Leaning toward Step 3a (GitHub Actions dual checkout) over submodule / remote loader. Final pick during Step 3.
+- **2026-04-28** — **Step 3a** (GitHub Actions dual checkout) chosen over submodule / remote loader. Workflow dispatch from content repo triggers frontend rebuild.
+- **2026-04-28** — Build artifact deployed via `cloudflare/wrangler-action` from GitHub Actions, not via Cloudflare Pages' native git integration — lets us keep content-repo PAT in GitHub secrets rather than Cloudflare env.

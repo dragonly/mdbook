@@ -1,13 +1,14 @@
 import { defineConfig } from "astro/config";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
+import { remarkAlert } from "remark-github-blockquote-alert";
+import { rehypeMdLinksAndImages } from "./src/lib/rehype-md-links";
 
 // https://astro.build/config
 export default defineConfig({
   site: "https://mdbook.pages.dev",
   markdown: {
     gfm: true,
-    // Shiki is Astro's default syntax highlighter; configure dual themes.
     shikiConfig: {
       themes: {
         light: "github-light",
@@ -15,6 +16,7 @@ export default defineConfig({
       },
       wrap: true,
     },
+    remarkPlugins: [remarkAlert],
     rehypePlugins: [
       rehypeSlug,
       [
@@ -25,6 +27,7 @@ export default defineConfig({
           content: { type: "text", value: "#" },
         },
       ],
+      rehypeMdLinksAndImages,
     ],
   },
 });
