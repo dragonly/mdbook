@@ -4,9 +4,161 @@ import { t } from "../i18n";
 ---
 
 <BaseLayout title={t("error.404.title")}>
-  <div class="error-state">
+  <div id="live-container" hidden>
+    <article class="prose" id="live-prose">
+      <header class="doc-header">
+        <h1 class="doc-title" id="live-title"></h1>
+        <div class="doc-meta">
+          <span class="live-badge">⚡ live preview</span>
+          <a id="live-github" target="_blank" rel="noopener">{t("doc.viewOnGithub")} ↗</a>
+        </div>
+      </header>
+      <div id="live-body"></div>
+    </article>
+  </div>
+
+  <div id="notfound-container" class="error-state">
     <h1>404 — {t("error.404.title")}</h1>
     <p>{t("error.404.body")}</p>
+    <p id="live-hint" style="margin-top:1.25rem;">
+      <button class="btn-ghost" data-action="open-settings">Add GitHub token for live preview</button>
+    </p>
     <p><a href="/">← {t("nav.home")}</a></p>
   </div>
 </BaseLayout>
+
+<script>
+  import { marked } from "marked";
+
+  const LS_TOKEN = "mdbook:pat";
+  const LS_REPO = "mdbook:content-repo";
+  const DEFAULT_REPO = "dragonly/md";
+
+  const liveContainer = document.getElementById("live-container")!;
+  const notfoundContainer = document.getElementById("notfound-container")!;
+  const liveTitle = document.getElementById("live-title")!;
+  const liveBody = document.getElementById("live-body")!;
+  const liveGithub = document.getElementById("live-github") as HTMLAnchorElement;
+
+  function showToast(msg: string, ms = 3500) {
+    const el = document.createElement("div");
+    el.className = "toast";
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), ms);
+  }
+
+  function parseFrontmatter(md: string): { data: Record<string, string>; body: string } {
+    const m = md.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+    if (!m) return { data: {}, body: md };
+    const data: Record<string, string> = {};
+    for (const line of m[1].split(/\r?\n/)) {
+      const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
+      if (kv) data[kv[1]] = kv[2].replace(/^["']|["']$/g, "").trim();
+    }
+    return { data, body: m[2] };
+  }
+
+  // Map GitHub-style alerts to styled blocks (mirrors remark-github-blockquote-alert output).
+  function postProcessAlerts(html: string): string {
+    const types = ["note", "tip", "important", "warning", "caution"];
+    const re = new RegExp(
+      `<blockquote>\\s*<p>\\[!(${types.join("|")})\\]\\s*(.*?)</p>([\\s\\S]*?)</blockquote>`,
+      "gi"
+    );
+    return html.replace(re, (_m, kind, firstLine, rest) => {
+      const k = String(kind).toLowerCase();
+      const cap = k.charAt(0).toUpperCase() + k.slice(1);
+      const first = firstLine ? `<p>${firstLine}</p>` : "";
+      return `<div class="markdown-alert markdown-alert-${k}"><p class="markdown-alert-title">${cap}</p>${first}${rest}</div>`;
+    });
+  }
+
+  // Rewrite relative .md links to SPA routes (matches our rehype plugin behavior).
+  function rewriteMdLinks(html: string): string {
+    return html.replace(/href="([^"]+)"/g, (m, href) => {
+      if (/^(https?:|mailto:|tel:|#|\/)/.test(href)) return m;
+      const mm = href.match(/^(.*?)\.md(#[^?]*)?(\?.*)?$/);
+      if (!mm) return m;
+      const [, path, hash = "", query = ""] = mm;
+      const cleaned = path.replace(/^\.\//, "");
+      return `href="${cleaned}/${query}${hash}"`;
+    });
+  }
+
+  function renderMarkdown(md: string): { title: string; html: string } {
+    const { data, body } = parseFrontmatter(md);
+    marked.setOptions({ gfm: true, breaks: false });
+    let html = marked.parse(body) as string;
+    html = postProcessAlerts(html);
+    html = rewriteMdLinks(html);
+    // Add loading="lazy" to images.
+    html = html.replace(/<img /g, '<img loading="lazy" decoding="async" ');
+    const title = data.title || body.match(/^#\s+(.+)$/m)?.[1] || "Untitled";
+    return { title, html };
+  }
+
+  async function tryLive(): Promise<void> {
+    const pat = localStorage.getItem(LS_TOKEN);
+    const repo = localStorage.getItem(LS_REPO) || DEFAULT_REPO;
+
+    // Derive the likely path in the content repo from the URL.
+    // /notes/hello/ → notes/hello.md
+    const url = new URL(window.location.href);
+    const pathname = url.pathname.replace(/^\/|\/$/g, "");
+    if (!pathname) return;
+    const candidate = `${pathname}.md`;
+
+    if (!pat) {
+      // No token — leave 404 UI as is; user can click "Add token".
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${repo}/contents/${encodeURI(candidate)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${pat}`,
+            Accept: "application/vnd.github.raw",
+          },
+        }
+      );
+
+      // Rate-limit telemetry.
+      const remaining = Number(res.headers.get("x-ratelimit-remaining") ?? "9999");
+      if (remaining < 100) {
+        showToast(`GitHub API rate limit low: ${remaining} remaining`);
+      }
+
+      if (res.status === 401 || res.status === 403) {
+        showToast("GitHub token invalid or lacks access. Update in settings.");
+        window.dispatchEvent(new Event("mdbook:open-settings"));
+        return;
+      }
+      if (res.status === 404) {
+        // Genuinely not in content repo either — keep 404 UI.
+        return;
+      }
+      if (!res.ok) {
+        showToast(`GitHub API error: ${res.status}`);
+        return;
+      }
+
+      const md = await res.text();
+      const { title, html } = renderMarkdown(md);
+      liveTitle.textContent = title;
+      liveBody.innerHTML = html;
+      liveGithub.href = `https://github.com/${repo}/blob/main/${candidate}`;
+      document.title = `${title} — mdbook (preview)`;
+
+      notfoundContainer.hidden = true;
+      liveContainer.hidden = false;
+    } catch (err) {
+      console.error("[live-preview] fetch failed", err);
+    }
+  }
+
+  tryLive();
+  window.addEventListener("mdbook:settings-saved", tryLive);
+</script>

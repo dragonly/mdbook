@@ -1,0 +1,114 @@
+---
+/**
+ * Settings modal: stores a GitHub fine-grained PAT in localStorage for
+ * client-side GitHub API calls (live-preview fallback).
+ *
+ * Rendered hidden; opened by #settings-open buttons or programmatically
+ * via window.dispatchEvent(new Event('mdbook:open-settings')).
+ */
+import { t } from "../i18n";
+---
+
+<dialog class="settings-modal" id="settings-modal">
+  <form method="dialog" class="settings-form">
+    <h2>Settings</h2>
+
+    <section>
+      <label for="pat-input"><strong>GitHub Personal Access Token</strong></label>
+      <p class="hint">
+        Needed to fetch docs not yet in the current build (live preview) and to
+        read the private content repo. Stored only in your browser's
+        <code>localStorage</code>.
+      </p>
+      <input
+        type="password"
+        id="pat-input"
+        placeholder="github_pat_…"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <p class="hint">
+        Recommended scope: fine-grained PAT, repo <code>dragonly/md</code>,
+        <code>Contents: Read</code>.
+        <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">
+          Create one ↗
+        </a>
+      </p>
+    </section>
+
+    <section>
+      <label for="content-repo-input"><strong>Content repo</strong></label>
+      <input
+        type="text"
+        id="content-repo-input"
+        placeholder="dragonly/md"
+        autocomplete="off"
+      />
+    </section>
+
+    <div class="settings-actions">
+      <button type="button" class="btn-ghost" id="pat-clear">Clear token</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn-ghost" id="settings-cancel">Cancel</button>
+      <button type="button" class="btn-primary" id="settings-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  const LS_TOKEN = "mdbook:pat";
+  const LS_REPO = "mdbook:content-repo";
+  const DEFAULT_REPO = "dragonly/md";
+
+  const modal = document.getElementById("settings-modal") as HTMLDialogElement | null;
+  const patInput = document.getElementById("pat-input") as HTMLInputElement | null;
+  const repoInput = document.getElementById("content-repo-input") as HTMLInputElement | null;
+
+  function load() {
+    if (patInput) patInput.value = localStorage.getItem(LS_TOKEN) ?? "";
+    if (repoInput) repoInput.value = localStorage.getItem(LS_REPO) ?? DEFAULT_REPO;
+  }
+
+  function open() {
+    load();
+    modal?.showModal();
+  }
+
+  function close() {
+    modal?.close();
+  }
+
+  function save() {
+    const pat = patInput?.value.trim() ?? "";
+    const repo = repoInput?.value.trim() || DEFAULT_REPO;
+    if (pat) localStorage.setItem(LS_TOKEN, pat);
+    else localStorage.removeItem(LS_TOKEN);
+    localStorage.setItem(LS_REPO, repo);
+    close();
+    window.dispatchEvent(new CustomEvent("mdbook:settings-saved"));
+  }
+
+  function clearToken() {
+    localStorage.removeItem(LS_TOKEN);
+    if (patInput) patInput.value = "";
+  }
+
+  // Delegate all openers.
+  document.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-action='open-settings']")) {
+      e.preventDefault();
+      open();
+    }
+  });
+  window.addEventListener("mdbook:open-settings", open);
+
+  document.getElementById("settings-save")?.addEventListener("click", save);
+  document.getElementById("settings-cancel")?.addEventListener("click", close);
+  document.getElementById("pat-clear")?.addEventListener("click", clearToken);
+
+  // Click outside to close.
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) close();
+  });
+</script>

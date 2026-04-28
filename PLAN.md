@@ -66,16 +66,19 @@ Demo: `https://mdbook-3vn.pages.dev` serves the latest content on every push.
 - ✅ Cross-repo dispatch uses `workflow_dispatch` endpoint (not `repository_dispatch`) — needs only actions:write, not contents:write
 - ✅ End-to-end smoke test: `notes/hello.md` pushed to content repo → rebuilt + live within ~90s — callouts, Shiki, pinned home section, external GitHub link all render correctly
 
-### Step 5 — PAT login + live-preview fallback ⬜
+### Step 5 — PAT login + live-preview fallback ✅
 
 Demo: a doc created 5 seconds ago (not yet in the build) renders correctly with a `⚡ live preview` badge.
 
-- ⬜ Settings panel (modal): enter GitHub PAT, stored in `localStorage` under a namespaced key, "clear token" button
-- ⬜ On doc 404 (SPA route miss), client fetches `https://api.github.com/repos/dragonly/md/contents/<path>` with the PAT, base64-decodes, renders client-side
-- ⬜ Client renderer reuses the same pipeline shape (GFM + Shiki + callouts) — use a compact bundle (marked + shiki web)
-- ⬜ `⚡ live preview` badge on such pages, plus a note "cached build may not include this yet"
-- ⬜ 401 / 403 → open PAT modal with deep link to GitHub token settings
-- ⬜ Rate-limit remaining < 100 → toast warning
+- ✅ `SettingsModal.astro` — `<dialog>`-based modal with PAT input, content-repo override, save/cancel/clear buttons, click-outside-to-close
+- ✅ Settings button (gear icon) in topbar; `data-action="open-settings"` delegation opens it from anywhere
+- ✅ PAT stored in `localStorage` under `mdbook:pat`; content-repo override under `mdbook:content-repo`
+- ✅ 404 page runs `tryLive()` on load: derives `<path>.md` from URL, fetches `api.github.com/repos/<repo>/contents/<path>` with `Accept: application/vnd.github.raw`
+- ✅ Client-side rendering via `marked` (GFM), with post-processors for GitHub callouts, relative `.md` link rewriting, and `loading="lazy"` on images — keeps visual parity with build-time output
+- ✅ `⚡ live preview` badge on fallback-rendered pages + modified `<title>` suffix `(preview)`
+- ✅ 401 / 403 → toast + auto-open settings modal
+- ✅ Rate-limit remaining < 100 → toast warning
+- ✅ Auto re-run after Settings save (`mdbook:settings-saved` event)
 
 ### Step 6 — Field-test agent write loop ⬜
 
